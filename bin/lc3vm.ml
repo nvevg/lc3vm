@@ -4,7 +4,7 @@ let original_tio = Unix.tcgetattr Unix.stdin
 
 let disable_input_buffering () =
   let open Unix in
-  let new_tio = { original_tio with c_icanon = false; c_echo = false; c_vmin = 0; c_vtime = 0; } in
+  let new_tio = { original_tio with c_icanon = false; c_echo = false; } in
   tcsetattr stdin TCSANOW new_tio
 ;;
 
@@ -57,7 +57,7 @@ let execute (cpu: Lc3vm.Cpu.t) =
     else
     let opw = state.mem.(state.pc) in
     Lc3vm.Opcode.parse_opcode opw
-    |> Result.map (fun opcode -> (Printf.printf "exec: pc = %#X opcode = %s\n" state.pc (Lc3vm.Opcode.opcode_to_string opcode); Lc3vm.Cpu.exec_op { state with pc = state.pc + 1 } opcode))
+    |> Result.map (fun opcode -> Lc3vm.Cpu.exec_op { state with pc = state.pc + 1 } opcode)
     |> Result.join
     |> unwrap
     |> aux

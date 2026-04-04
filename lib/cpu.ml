@@ -30,10 +30,10 @@ let from_image (image_path : string) =
   )
 ;;
 
-let check_key () =
-  match Unix.select [ Unix.stdin ] [] [] 0.5 with
+let check_key (timeout: float)=
+  match Unix.select [ Unix.stdin ] [] [] timeout with
   | [], _, _ -> false
-  | _ :: _, _, _ -> (output_string stdout "got key\n"; true)
+  | _ :: _, _, _ -> true
 ;;
 
 let read_stdin_char_nonblock () =
@@ -43,9 +43,35 @@ let read_stdin_char_nonblock () =
   | _ -> None
 ;;
 
+let read_stdin_char () = 
+  let rec poll () = 
+    if check_key (-1.0) then 
+        match read_stdin_char_nonblock () with
+        | Some ch -> ch
+        | None -> poll ()
+    else poll ()
+    in
+    poll ()
+;;
+
+let write_stdout_char ch = 
+  let buf = Bytes.make 1 ch in
+  ignore (Unix.write Unix.stdout buf 0 1)
+;;
+
+let write_stdout_string s =
+  let len = String.length s in
+  let rec aux off =
+    if off < len then
+      let n = Unix.write_substring Unix.stdout s off (len - off) in
+      aux (off + n)
+  in
+  aux 0
+;;
+
 let read_mem (cpu : t) (addr : int) =
   if addr = Const.kbsr_mem_loc then begin
-    if check_key () then begin
+    if check_key (0.05) then begin
       match read_stdin_char_nonblock () with
       | Some ch -> (cpu.mem.(Const.kbdr_mem_loc) <- ch; cpu.mem.(Const.kbsr_mem_loc) <- (1 lsl 15))
       | None -> ()
@@ -73,7 +99,7 @@ let update_flags (dr: Registers.register) (cpu: t) =
 ;; 
 
 let exec_lea (cpu: t) (op: Opcode.lea_op) = 
-  let addr = cpu.pc + op.pc_offset in 
+  let addr = cpu.pc +^ op.pc_offset in 
   { cpu with registers = Registers.set ~register:op.dr ~value:addr cpu.registers }
   |> update_flags op.dr
 ;;
@@ -88,40 +114,35 @@ let exec_trap_puts (cpu: t) =
       else mem_to_string (addr + 1) (acc ^ (String.make 1 (char_of_int ival)))
   in
   let* res_str = mem_to_string (Registers.get ~register:Registers.R_R0 cpu.registers) "" in
-  output_string stdout res_str; flush stdout;
+  write_stdout_string res_str;
   Ok cpu
 ;;
 
 let exec_trap_halt (cpu: t) = 
-  Printf.printf "\nHALT\n";
-  flush stdout;
+  write_stdout_string "\nHALT\n";
   Ok { cpu with halted = true }
 ;;
 
 let exec_trap_getc (cpu: t) =
-  let ch = input_char stdin in
-  Printf.printf "trap_getc: input char = %c" ch; flush stdout;
-  let new_regs = Registers.set ~register:Registers.R_R0 ~value:((int_of_char ch) land 0xFF) cpu.registers in
-  Ok ({ cpu with registers = new_regs } |> update_flags Registers.R_R0)
+  let ch = read_stdin_char () in
+  let new_regs = Registers.set ~register:Registers.R_R0 ~value:(ch land 0xFF) cpu.registers in
+  Ok { cpu with registers = new_regs }
 ;;
 
 let exec_trap_out (cpu: t) = 
   let r0 = Registers.get ~register:Registers.R_R0 cpu.registers in
-  let val8 = r0 land 0xF in
+  let val8 = r0 land 0xFF in
   let char_val = char_of_int val8 in 
-  output_char stdout char_val;
-  flush stdout;
+  write_stdout_char char_val;
   Ok cpu;
 ;;
 
 let exec_trap_in (cpu: t) = 
-  output_string stdout "Enter a character: ";
-  flush stdout;
-  let ch = input_char stdin in 
-  output_char stdout ch;
-  flush stdout;
-  let regs = Registers.set ~register:Registers.R_R0 ~value:(int_of_char ch) cpu.registers in
-  Ok ({ cpu with registers = regs } |> update_flags Registers.R_R0)
+  write_stdout_string "Enter a character: ";
+  let ch = read_stdin_char () in 
+  write_stdout_char (char_of_int ch);
+  let regs = Registers.set ~register:Registers.R_R0 ~value:(ch land 0xFF) cpu.registers in
+  Ok { cpu with registers = regs }
 ;;
 
 let exec_trap_putsp (cpu: t) = 
@@ -139,7 +160,7 @@ let exec_trap_putsp (cpu: t) =
       mem_to_string (addr + 1) new_acc
   in
   let* res_str = mem_to_string (Registers.get ~register:Registers.R_R0 cpu.registers) "" in
-  output_string stdout res_str; flush stdout;
+  write_stdout_string res_str;
   Ok cpu
 ;;
 
@@ -177,8 +198,9 @@ let exec_and (cpu: t) (op: Opcode.binary_op) =
 let exec_not (cpu: t) (op: Opcode.unary_op) = 
   let srv = Registers.get ~register:op.sr cpu.registers in
   let compliment = lnot srv in
-  { cpu with registers = Registers.set ~register:op.dr ~value:compliment cpu.registers } |> update_flags op.dr
-
+  { cpu with registers = Registers.set ~register:op.dr ~value:compliment cpu.registers } 
+  |> update_flags op.dr
+;;
 
 let exec_br (cpu: t) (op: Opcode.br_op) = 
   let zero = (cpu.cond = Const.cond_zero && op.z) in
@@ -208,7 +230,6 @@ let exec_ld (cpu: t) (op: Opcode.ld_op) =
 let exec_ldi (cpu: t) (op: Opcode.ldi_op) = 
   let* addr1 = read_mem cpu (cpu.pc +^ op.pc_offset) in
   let* value = read_mem cpu addr1 in 
-  (Printf.printf "ldi: value = %d addr0 = %#X addr1 = %#X\n" value (cpu.pc +^ op.pc_offset) addr1); flush stdout;
   Ok ({ cpu with registers = Registers.set ~register:op.dr ~value:value cpu.registers } |> update_flags op.dr)
 ;;
 
