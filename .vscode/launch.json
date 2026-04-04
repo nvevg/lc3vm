@@ -1,0 +1,11 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run OCaml (dune)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "dune exec _build/default/bin/lc3vm.exe"
+    }
+  ]
+}

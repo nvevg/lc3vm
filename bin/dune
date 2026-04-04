@@ -1,0 +1,4 @@
+(executable
+ (public_name lc3vm)
+ (name lc3vm)
+ (libraries stdio lc3vm.lib))

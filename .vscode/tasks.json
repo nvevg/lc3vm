@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dune build",
+      "type": "shell",
+      "command": "dune build",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "dune exec",
+      "type": "shell",
+      "command": "dune exec ./bin/main.exe",
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

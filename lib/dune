@@ -1,0 +1,6 @@
+(library
+ (name lc3vm)
+ (public_name lc3vm.lib)
+ (libraries unix)
+ (inline_tests)
+ (preprocess (pps ppx_jane)))
