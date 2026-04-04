@@ -13,21 +13,43 @@ type t = {
 let from_image (image_path : string) =
   let memory = Array.make Const.memory_max 0 in
   In_channel.with_open_bin image_path (fun ic ->
-    let tmp = Bytes.create 2 in
-    match In_channel.really_input ic tmp 0 2 with
-    | Some () ->
-      let origin = Bytes.get_uint16_be tmp 0 in
-      let to_read = Const.memory_max - origin in
-      let buf = Bytes.create to_read in
-      let nread = In_channel.input ic buf 0 to_read in
-      let nwords = nread / 2 in
-      for i = 0 to nwords - 1 do
-        let word = Bytes.get_uint16_be buf (i * 2) in
-        memory.(origin + i) <- word
-      done;
-      Ok { pc = origin; registers = Registers.make (); mem = memory; cond = Const.cond_zero; halted = false; }
+    let hdr = Bytes.create 2 in
+    match In_channel.really_input ic hdr 0 2 with
     | None -> Error `FailedToReadImage
-  )
+    | Some () ->
+        let origin = Bytes.get_uint16_be hdr 0 in
+        if origin >= Const.memory_max then
+          Error `FailedToReadImage
+        else
+          let words_available = Const.memory_max - origin in
+          let bytes_available = words_available * 2 in
+          let buf = Bytes.create bytes_available in
+
+          let rec read_all off remaining =
+            if remaining = 0 then
+              Ok off
+            else
+              match In_channel.input ic buf off remaining with
+              | 0 -> Ok off
+              | n -> read_all (off + n) (remaining - n)
+          in
+
+          let* nread = read_all 0 bytes_available in
+          if nread mod 2 <> 0 then
+            Error `FailedToReadImage
+          else
+            let nwords = nread / 2 in
+            for i = 0 to nwords - 1 do
+              let word = Bytes.get_uint16_be buf (i * 2) in
+              memory.(origin + i) <- word
+            done;
+            Ok
+              { pc = origin
+              ; registers = Registers.make ()
+              ; mem = memory
+              ; cond = Const.cond_zero
+              ; halted = false
+              })
 ;;
 
 let check_key (timeout: float)=
@@ -56,7 +78,7 @@ let read_stdin_char () =
 
 let write_stdout_char ch = 
   let buf = Bytes.make 1 ch in
-  ignore (Unix.write Unix.stdout buf 0 1)
+  ignore (Unix.write Unix.stdout buf 0 1); flush stdout;
 ;;
 
 let write_stdout_string s =
@@ -66,7 +88,7 @@ let write_stdout_string s =
       let n = Unix.write_substring Unix.stdout s off (len - off) in
       aux (off + n)
   in
-  aux 0
+  aux 0; flush stdout;
 ;;
 
 let read_mem (cpu : t) (addr : int) =
@@ -163,7 +185,7 @@ let exec_trap_putsp (cpu : t) =
         let hi = (word lsr 8) land 0xFF in
         write_stdout_char (char_of_int lo);
         if hi <> 0 then
-          write_stdout_char(char_of_int hi);
+          write_stdout_char (char_of_int hi);
         loop ((addr + 1) land 0xFFFF)
   in
   let start = Registers.get ~register:Registers.R_R0 cpu.registers land 0xFFFF in
