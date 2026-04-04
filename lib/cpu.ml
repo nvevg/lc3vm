@@ -104,17 +104,22 @@ let exec_lea (cpu: t) (op: Opcode.lea_op) =
   |> update_flags op.dr
 ;;
 
-let exec_trap_puts (cpu: t) = 
-  let rec mem_to_string addr acc = 
-    if addr >= Const.memory_max || addr < 0 then
+let exec_trap_puts (cpu : t) =
+  let rec loop addr =
+    if addr < 0 || addr >= Const.memory_max then
       Error (`InvalidMemoryAccess (addr, cpu.pc))
     else
-      let ival = cpu.mem.(addr) in
-      if ival = 0x00 then Ok acc
-      else mem_to_string (addr + 1) (acc ^ (String.make 1 (char_of_int ival)))
+      let word = cpu.mem.(addr) land 0xFFFF in
+      let ch = word land 0xFF in
+      if ch = 0x00 then
+        Ok ()
+      else
+        let () = output_char stdout (char_of_int ch) in
+        loop ((addr + 1) land 0xFFFF)
   in
-  let* res_str = mem_to_string (Registers.get ~register:Registers.R_R0 cpu.registers) "" in
-  write_stdout_string res_str;
+  let start = Registers.get ~register:Registers.R_R0 cpu.registers land 0xFFFF in
+  let* () = loop start in
+  flush stdout;
   Ok cpu
 ;;
 
@@ -145,22 +150,24 @@ let exec_trap_in (cpu: t) =
   Ok { cpu with registers = regs }
 ;;
 
-let exec_trap_putsp (cpu: t) = 
-  let rec mem_to_string addr acc = 
-    if addr >= Const.memory_max || addr < 0 then Error (`InvalidMemoryAccess (addr, cpu.pc))
+let exec_trap_putsp (cpu : t) =
+  let rec loop addr =
+    if addr < 0 || addr >= Const.memory_max then
+      Error (`InvalidMemoryAccess (addr, cpu.pc))
     else
       let word = cpu.mem.(addr) land 0xFFFF in
-      if word = 0x0000 then Ok acc
+      if word = 0x0000 then
+        Ok ()
       else
-      let char_lo = Utils.bits ~pos:0 ~width:8 word in
-      let char_hi = Utils.bits ~pos:8 ~width:8 word in
-      let new_acc = 
-        (acc ^ (String.make 1 (char_of_int char_lo)) ^ (if char_hi = 0x00 then "" else String.make 1 (char_of_int char_hi)))
-      in
-      mem_to_string (addr + 1) new_acc
+        let lo = word land 0xFF in
+        let hi = (word lsr 8) land 0xFF in
+        write_stdout_char (char_of_int lo);
+        if hi <> 0 then
+          write_stdout_char(char_of_int hi);
+        loop ((addr + 1) land 0xFFFF)
   in
-  let* res_str = mem_to_string (Registers.get ~register:Registers.R_R0 cpu.registers) "" in
-  write_stdout_string res_str;
+  let start = Registers.get ~register:Registers.R_R0 cpu.registers land 0xFFFF in
+  let* () = loop start in
   Ok cpu
 ;;
 
