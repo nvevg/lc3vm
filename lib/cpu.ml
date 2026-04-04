@@ -184,7 +184,7 @@ let get_value (cpu: t) (v: Opcode.register_or_value) =
 let exec_add (cpu: t) (op: Opcode.binary_op) = 
   let rhs = get_value cpu op.sr2 in
   let lhs = Registers.get ~register:op.sr1 cpu.registers in
-  { cpu with registers = Registers.set ~register:op.dr ~value:(lhs + rhs) cpu.registers }
+  { cpu with registers = Registers.set ~register:op.dr ~value:(lhs +^ rhs) cpu.registers }
   |> update_flags op.dr
 ;;
 
@@ -217,9 +217,13 @@ let exec_jmp (cpu: t) (op: Opcode.jmp_op) =
 
 let exec_ret (cpu: t) = { cpu with pc = Registers.get ~register:Registers.R_R7 cpu.registers };;
 
-let exec_jsr (cpu: t) (op: Opcode.jsr_op) = { cpu with pc = cpu.pc +^ op.pc_offset };;
+let exec_jsr (cpu: t) (op: Opcode.jsr_op) = 
+  let regs = Registers.set ~register:Registers.R_R7 ~value:cpu.pc cpu.registers in
+  { cpu with registers = regs; pc = cpu.pc +^ op.pc_offset };;
 
-let exec_jsrr (cpu: t) (op: Opcode.jsrr_op) = { cpu with pc = cpu.pc +^ Registers.get ~register:op.base_r cpu.registers };;
+let exec_jsrr (cpu: t) (op: Opcode.jsrr_op) = 
+  let regs = Registers.set ~register:Registers.R_R7 ~value:cpu.pc cpu.registers in
+  { cpu with registers = regs; pc = Registers.get ~register:op.base_r cpu.registers };;
 
 let exec_ld (cpu: t) (op: Opcode.ld_op) = 
   let addr = cpu.pc +^ op.pc_offset in

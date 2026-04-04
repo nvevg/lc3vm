@@ -51,13 +51,16 @@ let execute (cpu: Lc3vm.Cpu.t) =
     | Error `PrivilegeViolation pc -> failwith (Printf.sprintf "lc3vm terminated abruptly: RTI in user space mode; pc = %#X" pc)
     | Error _ -> failwith "lc3vm: unknown error"
   in
+  let process_opcode (state: Lc3vm.Cpu.t) opcode  = 
+    Lc3vm.Cpu.exec_op { state with pc = state.pc + 1 } opcode
+  in
   let rec aux (state: Lc3vm.Cpu.t) = 
     if state.halted then Ok ()
     else if state.pc >= Lc3vm.Const.memory_max then failwith ("lc3vm: all code and no HALT")
     else
     let opw = state.mem.(state.pc) in
     Lc3vm.Opcode.parse_opcode opw
-    |> Result.map (fun opcode -> Lc3vm.Cpu.exec_op { state with pc = state.pc + 1 } opcode)
+    |> Result.map (process_opcode state)
     |> Result.join
     |> unwrap
     |> aux

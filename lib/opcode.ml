@@ -63,7 +63,7 @@ let parse_binary_op opw =
     let* sr2 = Registers.register_from_int (Utils.bits opw ~pos:0 ~width:3) in
     Ok { dr; sr1; sr2 = Register sr2; }
   else
-    let value_bits = Utils.bits opw ~pos:0 ~width:4 in
+    let value_bits = Utils.bits opw ~pos:0 ~width:5 in
     Ok { dr; sr1; sr2 = Value (Utils.sext16 value_bits 5) }
   ;;
 
