@@ -115,7 +115,7 @@ let parse_jsr_jsrr opw =
 let parse_ld opw = 
   let pc_offset = Utils.bits opw ~pos:0 ~width:9 in
   let* register = Registers.register_from_int (Utils.bits opw ~pos:9 ~width:3) in
-  Ok (OP_LD { dr = register; pc_offset = (Utils.sext16 pc_offset 10) })
+  Ok (OP_LD { dr = register; pc_offset = (Utils.sext16 pc_offset 9) })
 ;;
 
 let parse_ldi opw = 
@@ -193,24 +193,25 @@ let register_or_value_to_string = function
   | Register r -> Registers.name r
   | Value v -> Printf.sprintf "%#X" v
 
-let opcode_to_string code = 
+let opcode_to_string ?incr_pc code =
+  let pc = Option.value incr_pc ~default:0x00 in 
   match code with
   | OP_ADD op -> Printf.sprintf "ADD %s, %s, %s" (Registers.name op.dr) (Registers.name op.sr1) (register_or_value_to_string op.sr2)
   | OP_AND op -> Printf.sprintf "AND %s, %s, %s" (Registers.name op.dr) (Registers.name op.sr1) (register_or_value_to_string op.sr2)
   | OP_NOT op -> Printf.sprintf "NOT %s, %s" (Registers.name op.dr) (Registers.name op.sr)
   | OP_BR op -> 
       let suffix = (if op.n then "n" else "") ^ (if op.z then "z" else "") ^ (if op.n then "p" else "") in
-      Printf.sprintf ("BR%s %#X") suffix op.pc_offset
+      Printf.sprintf ("BR%s %#X") suffix (op.pc_offset +^ pc)
   | OP_JMP op -> Printf.sprintf "JMP %s" (Registers.name op.base_r)
   | OP_RET _ -> "RET"
-  | OP_JSR op -> Printf.sprintf "JSR %#X" op.pc_offset
+  | OP_JSR op -> Printf.sprintf "JSR %#X" (op.pc_offset +^ pc)
   | OP_JSRR op -> Printf.sprintf "JSRR %s" (Registers.name op.base_r)
-  | OP_LD op -> Printf.sprintf "LD %s, %#X" (Registers.name op.dr) op.pc_offset
-  | OP_LDI op -> Printf.sprintf "LDI %s, %#X" (Registers.name op.dr) op.pc_offset
+  | OP_LD op -> Printf.sprintf "LD %s, %#X" (Registers.name op.dr) (op.pc_offset +^ pc)
+  | OP_LDI op -> Printf.sprintf "LDI %s, %#X" (Registers.name op.dr) (op.pc_offset +^ pc)
   | OP_LDR op -> Printf.sprintf "LDR %s, %s, %#X" (Registers.name op.dr) (Registers.name op.base_r) op.offset
-  | OP_LEA op -> Printf.sprintf "LEA %s, %#X" (Registers.name op.dr) op.pc_offset
+  | OP_LEA op -> Printf.sprintf "LEA %s, %#X" (Registers.name op.dr) (op.pc_offset +^ pc)
   | OP_RTI _ -> "RTI"
-  | OP_ST op -> Printf.sprintf "ST %s, %#X" (Registers.name op.sr) op.pc_offset 
-  | OP_STI op -> Printf.sprintf "STI %s, %#X" (Registers.name op.sr) op.pc_offset 
-  | OP_STR op -> Printf.sprintf "STR %s, %s, %d" (Registers.name op.sr) (Registers.name op.base_r) op.pc_offset 
+  | OP_ST op -> Printf.sprintf "ST %s, %#X" (Registers.name op.sr) (op.pc_offset +^ pc)
+  | OP_STI op -> Printf.sprintf "STI %s, %#X" (Registers.name op.sr) (op.pc_offset +^ pc)
+  | OP_STR op -> Printf.sprintf "STR %s, %s, %#X" (Registers.name op.sr) (Registers.name op.base_r) (op.pc_offset +^ pc)
   | OP_TRAP op -> Printf.sprintf "TRAP %#X" op.vect

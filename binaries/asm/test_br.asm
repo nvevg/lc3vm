@@ -37,7 +37,7 @@ LOOP1   ADD R1, R1, #-1         ; R1--
         BRnzp FAIL
 
 LOOP1_DONE
-; тут R1 должен быть 0
+; R1 is 0 here
 
 ; -----------------------------
 ; 5. unconditional backward jump
@@ -51,13 +51,13 @@ LOOP2   ADD R2, R2, #-1
         BRnzp FAIL
 
 LOOP2_DONE
-; тут R2 должен быть 0
+; R2 is 0 here
 
 ; -----------------------------
 ; 6. check branch base is PC+1
 ; -----------------------------
         BRnzp SKIP_FAIL
-        BRnzp FAIL              ; должно быть пропущено
+        BRnzp FAIL              ; should not jump
 SKIP_FAIL
 
 ; -----------------------------

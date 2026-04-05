@@ -27,7 +27,7 @@ let setup () =
 let disasm (state: Lc3vm.Cpu.t) =
   let handle_opcode pc res = 
     match res with
-    | Ok opcode -> Printf.printf "%#X\t %s\n" pc (Lc3vm.Opcode.opcode_to_string opcode)
+    | Ok opcode -> Printf.printf "%#X\t %s\n" pc (Lc3vm.Opcode.opcode_to_string ~incr_pc:(pc + 1) opcode)
     | Error `UnusedOpcode -> Printf.printf "%#X\t Unused opcode, skipping\n" pc
     | Error `InvalidOpcode opw -> Printf.printf "%#X\t INVALID OPCODE (%s)\n" pc (Lc3vm.Utils.int_to_bstr opw)
     | Error `UnknownOpcode opcode -> Printf.printf "%#X\t UNKNOWN OPCODE %s\n" pc (Lc3vm.Utils.int_to_bstr opcode)
@@ -52,6 +52,8 @@ let execute (cpu: Lc3vm.Cpu.t) =
     | Error _ -> failwith "lc3vm: unknown error"
   in
   let process_opcode (state: Lc3vm.Cpu.t) opcode  = 
+    (*if (state.pc == 0x3041 || (state.pc >= 0x30D5 && state.pc <= 0x30ED)) then*)
+    (*(Printf.printf "exec: processing opcode %s; pc = %#X\n" (Lc3vm.Opcode.opcode_to_string opcode) state.pc; flush stdout);*)
     Lc3vm.Cpu.exec_op { state with pc = state.pc + 1 } opcode
   in
   let rec aux (state: Lc3vm.Cpu.t) = 
