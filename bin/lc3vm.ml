@@ -52,8 +52,6 @@ let execute (cpu: Lc3vm.Cpu.t) =
     | Error _ -> failwith "lc3vm: unknown error"
   in
   let process_opcode (state: Lc3vm.Cpu.t) opcode  = 
-    (*if (state.pc == 0x3041 || (state.pc >= 0x30D5 && state.pc <= 0x30ED)) then*)
-    (*(Printf.printf "exec: processing opcode %s; pc = %#X\n" (Lc3vm.Opcode.opcode_to_string opcode) state.pc; flush stdout);*)
     Lc3vm.Cpu.exec_op { state with pc = state.pc + 1 } opcode
   in
   let rec aux (state: Lc3vm.Cpu.t) = 
